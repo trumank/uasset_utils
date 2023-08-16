@@ -1,0 +1,8 @@
+[package]
+name = "uasset_utils"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+unreal_asset = { workspace = true }
+anyhow = { workspace = true }
