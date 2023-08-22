@@ -453,7 +453,7 @@ pub fn copy_expression<C: std::io::Read + std::io::Seek>(from: &Asset<C>, to: &m
     }
 }
 
-fn get_generic_property(prop: &FProperty) -> &FGenericProperty {
+pub fn get_generic_property(prop: &FProperty) -> &FGenericProperty {
     match prop {
         FProperty::FGenericProperty(p) => p,
         FProperty::FEnumProperty(p) => &p.generic_property,
