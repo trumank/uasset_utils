@@ -1,12 +1,3 @@
-macro_rules! inst_member {
-    (@inst $name:ident) => {
-        $name: Box<Expr>,
-    };
-    (@vec $name:ident) => {
-        $name: Vec<Expr>,
-    };
-}
-
 macro_rules! inst_walk {
     (@ $ex:ident $member_name:ident : Expr) => {
         walk_macro(&$ex.$member_name);
@@ -15,23 +6,12 @@ macro_rules! inst_walk {
         walk_macro(&$ex.$member_name);
     };
     (@ $ex:ident $member_name:ident : Vec<Expr>) => {
-        for $ex in $ex.$member_name { walk_macro(&$ex); }
+        for $ex in $ex.$member_name.iter() { walk_macro(&$ex); }
     };
     (@ $ex:ident $member_name:ident : $tp:ty) => {
     };
     ($ex:ident, $member_name:ident : $($tp:tt)*) => {
         inst_walk!(@ $ex $member_name : $($tp)*)
-    };
-}
-macro_rules! build_walk {
-    ($ex:ident, $( $name:ident, { $( $member_name:ident : { $($member_type:tt)* } )* } )* ) => {
-        fn walk_macro(ex: &Expr) {
-            match ex {
-                $( Expr::$name($ex) => {
-                    $(inst_walk!($ex, $member_name : $($member_type)*);)*
-                }, )*
-            }
-        }
     };
 }
 
@@ -43,47 +23,35 @@ macro_rules! inst {
     };
 }
 
-macro_rules! for_each2 {
+macro_rules! for_each {
     ( $( $name:ident { $( $member_name:ident : [ $($member_type:tt)* ] )* } )* ) => {
         pub enum Expr {
             $( $name($name), )*
         }
         $( inst!($name, $($member_name : [$($member_type)*]),* );)*
-        build_walk!(ex, $( $name, { $( $member_name : { $($member_type)* } ) } )*);
+        fn walk_macro(ex: &Expr) {
+            match ex {
+                $( Expr::$name(ex) => {
+                    $(inst_walk!(ex, $member_name : $($member_type)*);)*
+                }, )*
+            }
+        }
     };
 }
 
-/*
-for_each_entry!(
+for_each!(
     ExLocalVariable {
-        //a: String,
-        b: Vec<Expr>,
-        c: Box<Expr>
-    },
+        b: [ Vec<Expr> ]
+        c: [ Box<Expr> ]
+    }
     ExInstanceVariable {
-        a: Vec<Expr>,
-    },
+        a: [ Vec<Expr> ]
+    }
     ExDefaultVariable {
-        b: Box<Expr>
-    },
+        b: [ Box<Expr> ]
+        other: [ String ]
+    }
 );
-*/
-
-mod a {
-    for_each2!(
-        ExLocalVariable {
-            //a: [ Expr ]
-            b: [ Vec<Expr> ]
-            c: [ Box<Expr> ]
-        }
-        ExInstanceVariable {
-            a: [ Vec<Expr> ]
-        }
-        ExDefaultVariable {
-            b: [Box<Expr>]
-        }
-    );
-}
 
 //for_each!( ExLocalVariable, ExInstanceVariable, ExDefaultVariable,);
 
