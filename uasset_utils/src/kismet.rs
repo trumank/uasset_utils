@@ -1,31 +1,39 @@
 macro_rules! inst {
-    ($l:ident) => {
-        struct $l {}
+    ($name:ident, $( $a:tt )* ) => {
+        struct $name {
+            $( $a: i32, )*
+        }
     };
 }
 
 macro_rules! braces_unwrap {
-    ( $Callback : path, { $( $Src : tt )* } ) => {
+    ( $Callback:path, $name:ident, $( $Src : tt )* ) => {
         $Callback!
         (
+            $name,
             $( $Src )*
         );
-    };
-    ( $Callback : path, $( $Src : tt )* ) => {
-        $Callback! ( $( $Src )*);
     };
 }
 
 macro_rules! for_each {
-    ( $( $Each : tt ),* $(,)?) => {
+    ( $( $name:ident { $( $Each : tt ),* $(,)?} ),* $(,)?) => {
         mod a {
-            $( braces_unwrap!( inst, $Each );)*
+            $( braces_unwrap!( inst, $name, $($Each)* );)*
         }
         mod b {
-            $( braces_unwrap!( inst, $Each );)*
+            $( braces_unwrap!( inst, $name, $($Each)* );)*
         }
     };
 }
+
+for_each!(
+    ExLocalVariable { a, b },
+    ExInstanceVariable { a },
+    ExDefaultVariable { b },
+);
+
+//for_each!( ExLocalVariable, ExInstanceVariable, ExDefaultVariable,);
 
 /*
 for_each!(
@@ -124,6 +132,7 @@ for_each!(
     ExFieldPathConst {},
 );
 */
+/*
 for_each!(
     ExLocalVariable,
     ExInstanceVariable,
@@ -219,3 +228,4 @@ for_each!(
     ExClassSparseDataVariable,
     ExFieldPathConst,
 );
+*/
