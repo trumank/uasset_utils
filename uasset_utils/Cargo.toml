@@ -6,3 +6,4 @@ edition.workspace = true
 [dependencies]
 unreal_asset = { workspace = true }
 anyhow = { workspace = true }
+byteorder = "1.5.0"
