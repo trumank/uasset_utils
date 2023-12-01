@@ -15,6 +15,7 @@ pub trait Writable<W> {
 
 type Guid = [u8; 16];
 impl<R: Read> Readable<R> for Guid {
+    #[tracing::instrument(name = "read_Guid", skip_all)]
     fn read(reader: &mut R) -> Result<Self> {
         let mut buf = [0; 16];
         reader.read_exact(&mut buf)?;
@@ -31,6 +32,7 @@ impl<W: Write> Writable<W> for Guid {
 #[derive(Debug, Clone, Copy)]
 pub struct NameIndex(usize);
 impl<R: Read> Readable<R> for NameIndex {
+    #[tracing::instrument(name = "read_NameIndex", skip_all)]
     fn read(reader: &mut R) -> Result<Self> {
         Ok(NameIndex(reader.read_u32::<LE>()? as usize))
     }
@@ -45,6 +47,7 @@ impl<W: Write> Writable<W> for NameIndex {
 #[derive(Debug, Clone, Copy)]
 pub struct NameIndexFlagged(pub usize, pub Option<u32>);
 impl<R: Read> Readable<R> for NameIndexFlagged {
+    #[tracing::instrument(name = "read_NameIndexFlagged", skip_all)]
     fn read(reader: &mut R) -> Result<Self> {
         let n = reader.read_u32::<LE>()?;
         Ok(if n & 0x80000000 != 0 {
@@ -74,6 +77,7 @@ pub struct Asset {
     pub asset_class: NameIndexFlagged,
 }
 impl<R: Read> Readable<R> for Asset {
+    #[tracing::instrument(name = "read_Asset", skip_all)]
     fn read(reader: &mut R) -> Result<Self> {
         Ok(Asset {
             object_path: NameIndexFlagged::read(reader)?,
@@ -91,6 +95,7 @@ impl<W: Write> Writable<W> for Asset {
     }
 }
 
+#[tracing::instrument(name = "read_array", skip_all)]
 fn read_array<R, T, E>(
     length: u32,
     reader: &mut R,
@@ -117,6 +122,7 @@ pub struct Pair {
 }
 
 impl<R: Read> Readable<R> for Pair {
+    #[tracing::instrument(name = "read_Pair", skip_all)]
     fn read(reader: &mut R) -> Result<Self> {
         let name = NameIndex::read(reader)?;
         let n = reader.read_u32::<LE>()?;
@@ -174,6 +180,7 @@ pub struct AssetData {
 }
 
 impl<R: Read> Readable<R> for AssetData {
+    #[tracing::instrument(name = "read_AssetData", skip_all)]
     fn read(reader: &mut R) -> Result<Self> {
         Ok(AssetData {
             object_path: NameIndexFlagged::read(reader)?,
@@ -213,6 +220,7 @@ pub struct Dependencies {
     pub package_data_buffer_size: u32,
 }
 impl<R: Read> Readable<R> for Dependencies {
+    #[tracing::instrument(name = "read_Dependencies", skip_all)]
     fn read(reader: &mut R) -> Result<Self> {
         Ok(Dependencies {
             dependencies_size: reader.read_u64::<LE>()?,
@@ -264,6 +272,7 @@ pub struct AssetRegistry {
 }
 
 impl<R: Read> Readable<R> for AssetRegistry {
+    #[tracing::instrument(name = "read_AssetRegistry", skip_all)]
     fn read(reader: &mut R) -> Result<Self> {
         let version = Guid::read(reader)?;
 
@@ -462,5 +471,47 @@ impl<W: Write> Writable<W> for AssetRegistry {
         self.dependencies.write(writer)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::io::{Read, Seek};
+
+    use unreal_asset::containers::Chain;
+
+    use super::{AssetRegistry, Readable};
+
+    #[test]
+    fn read_test1() {
+        let mut r = std::io::Cursor::new(
+            std::fs::read("../../../unpacked-fsd/FSD/AssetRegistry.bin").unwrap(),
+        );
+        ser_hex::read("trace1.json", &mut r, AssetRegistry::read).unwrap();
+    }
+
+    #[test]
+    fn read_test2() {
+        let mut r = std::io::Cursor::new(
+            std::fs::read("../../../unpacked-fsd/FSD/AssetRegistry.bin").unwrap(),
+        );
+
+        ser_hex::read("trace2.json", &mut r, read)
+    }
+
+    #[tracing::instrument(skip_all)]
+    fn read<R: Read + Seek>(reader: &mut R) {
+        let (object_version, object_version_ue5) =
+            unreal_asset::engine_version::get_object_versions(
+                unreal_asset::engine_version::EngineVersion::VER_UE4_27,
+            );
+        let mut raw_reader = unreal_asset::reader::RawReader::new(
+            Chain::new(reader, None),
+            object_version,
+            object_version_ue5,
+            false,
+            unreal_asset::containers::NameMap::new(),
+        );
+        let ar = unreal_asset::registry::AssetRegistryState::new(&mut raw_reader);
     }
 }
