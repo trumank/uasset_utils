@@ -20,7 +20,7 @@ use unreal_asset::{
     object_version::{ObjectVersion, ObjectVersionUE5},
     reader::archive_trait::ArchiveTrait,
     types::PackageIndex,
-    Asset, Import,
+    Asset, AssetBuilder, Import,
 };
 
 use std::{
@@ -83,7 +83,7 @@ pub fn read_asset<P: AsRef<Path>>(
 ) -> Result<Asset<Cursor<Vec<u8>>>> {
     let uasset = Cursor::new(fs::read(&path)?);
     let uexp = Cursor::new(fs::read(path.as_ref().with_extension("uexp"))?);
-    let asset = Asset::new(uasset, Some(uexp), version, None)?;
+    let asset = AssetBuilder::new(uasset, version).bulk(uexp).build()?;
 
     /*
     let mut out_uasset = Cursor::new(vec![]);
