@@ -478,40 +478,13 @@ impl<W: Write> Writable<W> for AssetRegistry {
 mod test {
     use std::io::{Read, Seek};
 
-    use unreal_asset::containers::Chain;
-
     use super::{AssetRegistry, Readable};
 
     #[test]
-    fn read_test1() {
+    fn read_test_min() {
         let mut r = std::io::Cursor::new(
-            std::fs::read("../../../unpacked-fsd/FSD/AssetRegistry.bin").unwrap(),
+            std::fs::read("../minimal_AssetRegistry.bin").unwrap(),
         );
         ser_hex::read("trace1.json", &mut r, AssetRegistry::read).unwrap();
-    }
-
-    #[test]
-    fn read_test2() {
-        let mut r = std::io::Cursor::new(
-            std::fs::read("../../../unpacked-fsd/FSD/AssetRegistry.bin").unwrap(),
-        );
-
-        ser_hex::read("trace2.json", &mut r, read)
-    }
-
-    #[tracing::instrument(skip_all)]
-    fn read<R: Read + Seek>(reader: &mut R) {
-        let (object_version, object_version_ue5) =
-            unreal_asset::engine_version::get_object_versions(
-                unreal_asset::engine_version::EngineVersion::VER_UE4_27,
-            );
-        let mut raw_reader = unreal_asset::reader::RawReader::new(
-            Chain::new(reader, None),
-            object_version,
-            object_version_ue5,
-            false,
-            unreal_asset::containers::NameMap::new(),
-        );
-        let ar = unreal_asset::registry::AssetRegistryState::new(&mut raw_reader);
     }
 }
