@@ -7,3 +7,4 @@ edition.workspace = true
 unreal_asset = { workspace = true }
 anyhow = { workspace = true }
 byteorder = "1.5.0"
+typed-path = "0.8.0"
