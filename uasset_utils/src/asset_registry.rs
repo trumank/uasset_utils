@@ -444,6 +444,29 @@ impl std::ops::Index<NameIndex> for Names {
     }
 }
 
+fn read_string<R: Read>(reader: &mut R, len: i16) -> Result<String> {
+    if len < 0 {
+        let chars = read_array((len - i16::MIN) as u32, reader, |r| r.read_u16::<LE>())?;
+        let length = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
+        Ok(String::from_utf16(&chars[..length])?)
+    } else {
+        let mut chars = vec![0; len as usize];
+        reader.read_exact(&mut chars)?;
+        let length = chars.iter().position(|&c| c == 0).unwrap_or(chars.len());
+        Ok(String::from_utf8(chars[..length].to_vec())?)
+    }
+}
+fn write_string<W: Write>(writer: &mut W, string: &str) -> Result<()> {
+    if string.is_ascii() {
+        writer.write_all(string.as_bytes())?;
+    } else {
+        for c in string.encode_utf16() {
+            writer.write_u16::<LE>(c)?;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, PartialEq)]
 pub struct AssetRegistry {
     pub version: Guid,
@@ -464,16 +487,13 @@ impl<R: Read> Readable<R> for AssetRegistry {
         let hash_version = reader.read_u64::<LE>()?;
 
         let _lowercase_hashes = read_array(name_count, reader, R::read_u64::<LE>)?;
-        let name_lengths = read_array(name_count, reader, R::read_u16::<BE>)?;
+        let name_lengths = read_array(name_count, reader, R::read_i16::<BE>)?;
 
         let names = Names(
             name_lengths
+                .clone()
                 .into_iter()
-                .map(|l| -> Result<String> {
-                    let mut chars = vec![0; l as usize];
-                    reader.read_exact(&mut chars)?;
-                    Ok(String::from_utf8_lossy(&chars).into_owned())
-                })
+                .map(|l| read_string(reader, l))
                 .collect::<Result<_>>()?,
         );
 
@@ -497,23 +517,45 @@ impl<W: Write> Writable<W> for AssetRegistry {
     fn write(&self, writer: &mut W) -> Result<()> {
         self.version.write(writer)?;
 
+        // TODO don't call encode_utf16 multiple times for each name
+        fn size<S: AsRef<str>>(s: S) -> u32 {
+            let s = s.as_ref();
+            if s.is_ascii() {
+                s.bytes().len() as u32
+            } else {
+                s.encode_utf16().count() as u32 * 2
+            }
+        }
+
         writer.write_u32::<LE>(self.version_int)?;
         writer.write_u32::<LE>(self.names.0.len() as u32)?;
-        writer.write_u32::<LE>(self.names.0.iter().map(|n| n.bytes().len() as u32).sum())?;
+        writer.write_u32::<LE>(self.names.0.iter().map(size).sum())?;
         writer.write_u64::<LE>(self.hash_version)?;
 
         write_array(writer, &self.names.0, |w, i| {
-            let hash = cityhasher::hash(i.to_ascii_lowercase().as_bytes());
+            let lower = i.to_ascii_lowercase();
+            let hash = if lower.is_ascii() {
+                cityhasher::hash(lower.as_bytes())
+            } else {
+                cityhasher::hash(
+                    lower
+                        .encode_utf16()
+                        .flat_map(|s| s.to_le_bytes())
+                        .collect::<Vec<u8>>(),
+                )
+            };
             Ok(w.write_u64::<LE>(hash)?)
         })?;
         write_array(writer, &self.names.0, |w, i| {
-            Ok(w.write_u16::<BE>(i.as_bytes().len() as u16)?)
+            let len = if i.is_ascii() {
+                i.as_bytes().len() as i16
+            } else {
+                i.encode_utf16().count() as i16 + i16::MIN
+            };
+            Ok(w.write_i16::<BE>(len)?)
         })?;
 
-        write_array(writer, &self.names.0, |w, i| {
-            w.write_all(i.as_bytes())?;
-            Ok(())
-        })?;
+        write_array(writer, &self.names.0, |w, i| write_string(w, i))?;
 
         self.store.write(writer)?;
 
