@@ -654,14 +654,17 @@ impl AssetRegistry {
             .object_name
             .get_owned_content();
 
-        // skip existing
-        if self
-            .asset_data
-            .iter()
-            .find(|a| self.names[a.object_path] == object_path_str)
-            .is_some()
-        {
-            return Ok(());
+        // skip if existing entry
+        // TODO performs linear scan through to find a match
+        // quite fast since it's just an integer comparision but can be faster with a map
+        if let Some(name_index) = self.names.0.get_index_of(&object_path_str) {
+            if self
+                .asset_data
+                .iter()
+                .any(|a| a.object_path.0 as usize == name_index)
+            {
+                return Ok(());
+            }
         }
 
         let object_path = self.get_name(&object_path_str);
