@@ -100,9 +100,9 @@ where
 {
     (0..length).map(|_| f(reader)).collect()
 }
-fn write_array<W, T, F>(writer: &mut W, array: &[T], mut f: F) -> Result<()>
+fn write_array<W, T, F>(writer: &mut W, array: impl IntoIterator<Item = T>, mut f: F) -> Result<()>
 where
-    F: FnMut(&mut W, &T) -> Result<()>,
+    F: FnMut(&mut W, T) -> Result<()>,
 {
     for item in array {
         f(writer, item)?;
@@ -430,7 +430,7 @@ impl<W: Write> Writable<W> for Store {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Names(pub Vec<String>);
+pub struct Names(pub indexmap::IndexSet<String>);
 impl std::ops::Index<NameIndexFlagged> for Names {
     type Output = String;
     fn index(&self, index: NameIndexFlagged) -> &Self::Output {
@@ -625,10 +625,10 @@ pub fn get_root_export<C: Read + Seek>(
 
 impl AssetRegistry {
     pub fn get_name(&mut self, name: &str) -> NameIndexFlagged {
-        if let Some((i, _name)) = self.names.0.iter().enumerate().find(|n| n.1 == name) {
+        if let Some(i) = self.names.0.get_index_of(name) {
             NameIndexFlagged(i as u32, None)
         } else {
-            self.names.0.push(name.to_string());
+            self.names.0.insert(name.to_string());
             NameIndexFlagged(self.names.0.len() as u32 - 1, None)
         }
     }
