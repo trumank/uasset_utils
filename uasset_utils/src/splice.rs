@@ -11,11 +11,12 @@ use unreal_asset::{
         FStructProperty,
     },
     kismet::{
-        ExByteConst, ExCallMath, ExContext, ExDefaultVariable, ExFalse, ExFloatConst,
-        ExInstanceVariable, ExIntConst, ExJumpIfNot, ExLet, ExLetBool, ExLetObj, ExLocalVariable,
-        ExLocalVirtualFunction, ExNameConst, ExNothing, ExObjectConst, ExReturn, ExSelf,
-        ExSetArray, ExStringConst, ExStructConst, ExStructMemberContext, ExTextConst, ExTrue,
-        FieldPath, KismetExpression, KismetExpressionDataTrait, KismetPropertyPointer,
+        ExByteConst, ExCallMath, ExContext, ExDefaultVariable, ExDynamicCast, ExFalse,
+        ExFloatConst, ExInstanceVariable, ExIntConst, ExJumpIfNot, ExLet, ExLetBool, ExLetObj,
+        ExLocalVariable, ExLocalVirtualFunction, ExNameConst, ExNoObject, ExNothing, ExObjectConst,
+        ExReturn, ExSelf, ExSetArray, ExStringConst, ExStructConst, ExStructMemberContext,
+        ExTextConst, ExTrue, FieldPath, KismetExpression, KismetExpressionDataTrait,
+        KismetPropertyPointer,
     },
     object_version::{ObjectVersion, ObjectVersionUE5},
     reader::archive_trait::ArchiveTrait,
@@ -366,19 +367,22 @@ pub fn copy_expression<C: std::io::Read + std::io::Seek>(from: &Asset<C>, to: &m
         KismetExpression::ExNameConst(ex) => ExNameConst { token: ex.token,
             value: to.add_fname(&ex.value.get_owned_content()),
         }.into(),
-        //KismetExpression::ExRotationConst(ex) => {}
-        //KismetExpression::ExVectorConst(ex) => {}
+        KismetExpression::ExRotationConst(ex) => ex.clone().into(),
+        KismetExpression::ExVectorConst(ex) => ex.clone().into(),
         KismetExpression::ExByteConst(ex) => ExByteConst { token: ex.token, value: ex.value, }.into(),
-        //KismetExpression::ExIntZero(ex) => {}
-        //KismetExpression::ExIntOne(ex) => {}
+        KismetExpression::ExIntZero(ex) => ex.clone().into(),
+        KismetExpression::ExIntOne(ex) => ex.clone().into(),
         KismetExpression::ExTrue(ex) => ExTrue { token: ex.token }.into(),
         KismetExpression::ExFalse(ex) => ExFalse { token: ex.token }.into(),
         KismetExpression::ExTextConst(ex) => ExTextConst { token: ex.token, value: ex.value.clone(), }.into(), // TODO: copy text
-        //KismetExpression::ExNoObject(ex) => {}
-        //KismetExpression::ExTransformConst(ex) => {}
-        //KismetExpression::ExIntConstByte(ex) => {}
-        //KismetExpression::ExNoInterface(ex) => {}
-        //KismetExpression::ExDynamicCast(ex) => {}
+        KismetExpression::ExNoObject(ex) => ExNoObject { token: ex.token }.into(),
+        KismetExpression::ExTransformConst(ex) => ex.clone().into(),
+        KismetExpression::ExIntConstByte(ex) => ex.clone().into(),
+        KismetExpression::ExNoInterface(ex) => ex.clone().into(),
+        KismetExpression::ExDynamicCast(ex) => ExDynamicCast { token: ex.token,
+            class_ptr: copy_package(from, to, ex.class_ptr),
+            target_expression: Box::new(copy_expression(from, to, fn_from, fn_to, &ex.target_expression)),
+        }.into(),
         KismetExpression::ExStructConst(ex) => ExStructConst { token: ex.token,
             struct_value: copy_package(from, to, ex.struct_value),
             struct_size: ex.struct_size,
@@ -392,9 +396,9 @@ pub fn copy_expression<C: std::io::Read + std::io::Seek>(from: &Asset<C>, to: &m
         }.into(),
         //KismetExpression::ExEndArray(ex) => {}
         //KismetExpression::ExPropertyConst(ex) => {}
-        //KismetExpression::ExUnicodeStringConst(ex) => {}
-        //KismetExpression::ExInt64Const(ex) => {}
-        //KismetExpression::ExUInt64Const(ex) => {}
+        KismetExpression::ExUnicodeStringConst(ex) => ex.clone().into(),
+        KismetExpression::ExInt64Const(ex) => ex.clone().into(),
+        KismetExpression::ExUInt64Const(ex) => ex.clone().into(),
         //KismetExpression::ExPrimitiveCast(ex) => {}
         //KismetExpression::ExSetSet(ex) => {}
         //KismetExpression::ExEndSet(ex) => {}
