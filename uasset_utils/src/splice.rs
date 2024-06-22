@@ -31,6 +31,8 @@ use std::{
 };
 use std::{collections::HashSet, io::Cursor};
 
+use crate::get_root_export;
+
 /// Holds mutations to bytecode offsets: from -> to
 type NamedSpliceMappings = HashMap<(Option<String>, PackageIndex), HashMap<usize, usize>>;
 type AssetInstructionMap = HashMap<PackageIndex, Vec<TrackedStatement>>;
@@ -613,11 +615,23 @@ fn copy_kismetpropertypointer<C: std::io::Read + std::io::Seek>(
                         .collect(),
                     resolved_owner: fp.resolved_owner,
                 }
-            } else if fp.resolved_owner == fn_from {
-                let ff = if let Some(Export::FunctionExport(f)) = from.get_export(fn_from) {
-                    f
+            } else if fp.resolved_owner.is_import() {
+                copy_fieldpath(from, to, fp)
+            } else if fp.resolved_owner.is_export() {
+                let (e_from, e_to) = if Some(fp.resolved_owner) == get_root_export(from) {
+                    // if property belongs to root export (class export), copy property between classes
+                    (get_root_export(from).unwrap(), get_root_export(to).unwrap())
+                } else if fp.resolved_owner == fn_from {
+                    // property belongs to function, copy between functions
+                    (fn_from, fn_to)
                 } else {
-                    unreachable!("fn_to must be a FunctionExport")
+                    unimplemented!("fp.resolved_owner != class or function");
+                };
+
+                let ff = match from.get_export(e_from) {
+                    Some(Export::FunctionExport(export)) => &export.struct_export,
+                    Some(Export::ClassExport(export)) => &export.struct_export,
+                    _ => unreachable!("e_from must be a StructExport"),
                 };
 
                 assert_eq!(fp.path.len(), 1, "path should have only one element");
@@ -625,8 +639,7 @@ fn copy_kismetpropertypointer<C: std::io::Read + std::io::Seek>(
                 let new_prop = copy_fproperty(
                     from,
                     to,
-                    ff.struct_export
-                        .loaded_properties
+                    ff.loaded_properties
                         .iter()
                         .find(|p| get_generic_property(p).name.eq_content(name))
                         .unwrap_or_else(|| {
@@ -634,19 +647,18 @@ fn copy_kismetpropertypointer<C: std::io::Read + std::io::Seek>(
                         }),
                 );
 
-                let ft = if let Some(Export::FunctionExport(f)) = to.get_export_mut(fn_to) {
-                    f
-                } else {
-                    unreachable!("fn_to must be a FunctionExport")
+                let ft = match to.get_export_mut(e_to) {
+                    Some(Export::FunctionExport(export)) => &mut export.struct_export,
+                    Some(Export::ClassExport(export)) => &mut export.struct_export,
+                    _ => unreachable!("e_to must be a StructExport"),
                 };
 
                 if !ft
-                    .struct_export
                     .loaded_properties
                     .iter()
                     .any(|p| get_generic_property(p).name.eq_content(name))
                 {
-                    ft.struct_export.loaded_properties.push(new_prop);
+                    ft.loaded_properties.push(new_prop);
                 } else {
                     // TODO: verify existing prop has the proper type or there's a name conflict
                 }
@@ -657,12 +669,10 @@ fn copy_kismetpropertypointer<C: std::io::Read + std::io::Seek>(
                         .iter()
                         .map(|n| to.add_fname(&n.get_owned_content()))
                         .collect(),
-                    resolved_owner: fn_to,
+                    resolved_owner: e_to,
                 }
-            } else if fp.resolved_owner.is_import() {
-                copy_fieldpath(from, to, fp)
             } else {
-                todo!("resolved_owner != fn_from");
+                unreachable!()
             }
         }),
         //new: p.new.as_ref().map(|fp| copy_fieldpath(from, to, &fp)),
