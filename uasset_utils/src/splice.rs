@@ -12,7 +12,7 @@ use unreal_asset::{
     },
     kismet::{
         ExByteConst, ExCallMath, ExContext, ExDefaultVariable, ExFalse, ExFloatConst,
-        ExInstanceVariable, ExIntConst, ExJumpIfNot, ExLet, ExLetObj, ExLocalVariable,
+        ExInstanceVariable, ExIntConst, ExJumpIfNot, ExLet, ExLetBool, ExLetObj, ExLocalVariable,
         ExLocalVirtualFunction, ExNameConst, ExNothing, ExObjectConst, ExReturn, ExSelf,
         ExSetArray, ExStringConst, ExStructConst, ExStructMemberContext, ExTextConst, ExTrue,
         FieldPath, KismetExpression, KismetExpressionDataTrait, KismetPropertyPointer,
@@ -340,7 +340,10 @@ pub fn copy_expression<C: std::io::Read + std::io::Seek>(from: &Asset<C>, to: &m
         }.into(),
         //KismetExpression::ExClassContext(ex) => {}
         //KismetExpression::ExMetaCast(ex) => {}
-        //KismetExpression::ExLetBool(ex) => {}
+        KismetExpression::ExLetBool(ex) => ExLetBool { token: ex.token,
+            variable_expression: Box::new(copy_expression(from, to, fn_from, fn_to, &ex.variable_expression)),
+            assignment_expression: Box::new(copy_expression(from, to, fn_from, fn_to, &ex.assignment_expression)),
+        }.into(),
         //KismetExpression::ExEndParmValue(ex) => {}
         //KismetExpression::ExEndFunctionParms(ex) => {}
         KismetExpression::ExSelf(ex) => ExSelf { token: ex.token }.into(),
